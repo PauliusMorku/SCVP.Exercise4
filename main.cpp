@@ -5,18 +5,25 @@
 class placeInterface : public sc_interface
 {
 public:
-    virtual void addTokens(unsigned int n) = 0;
-    virtual void removeTokens(unsigned int n) = 0;
-    virtual unsigned int testTokens(void) = 0;
+    virtual void addTokens(void) = 0;
+    virtual void removeTokens(void) = 0;
+    virtual bool testTokens(void) = 0;
 };
 
 // Place Channel:
+template<unsigned int I=1, unsigned int O=1>
 class place : public placeInterface
 {
 public:
-    void addTokens(unsigned int n){tokens = tokens + n;}
-    void removeTokens(unsigned int n){tokens = tokens - n;}
-    unsigned int testTokens(void){return tokens;}
+    void addTokens(void){tokens = tokens + I;}
+    // TODO: not sure how the following function should behave when we remove more tokens than it has
+    void removeTokens(void){
+        if (tokens >= O)
+            tokens = tokens - O;
+        else
+            tokens = 0;
+    }
+    bool testTokens(void){return tokens > 0;}
 
     place(unsigned int n) {tokens = n;}
 
@@ -37,7 +44,7 @@ public:
         // this loop checks if every input port contains atleast one token, if not - return is called
         for (unsigned int i = 0; i < N; i++)
         {
-            if (in[i]->testTokens() <= 0)
+            if (in[i]->testTokens() == false)
             {
                 std::cout << this->name() << ": NOT Fired" << std::endl;
                 return;
@@ -46,12 +53,12 @@ public:
 
         for (unsigned int i = 0; i < N; i++)
         {
-            in[i]->removeTokens(1);
+            in[i]->removeTokens();
         }
 
         for (unsigned int i = 0; i < M; i++)
         {
-            out[i]->addTokens(1);
+            out[i]->addTokens();
         }
 
         std::cout << this->name() << ": Fired" << std::endl;
@@ -70,7 +77,7 @@ SC_MODULE(toplevel)
     transition<1,2> t1; // <?,?> passes parameters to module, <> leaves default parameters
     transition<2,1> t2;
     transition<1,1> t3;
-    place p1, p2, p3, p4;
+    place<1,1>  p1, p2, p3, p4;
 
 
     SC_CTOR(toplevel) : t1("t1"), t2("t2"), t3("t3"), p1(1), p2(0), p3(0), p4(0)
