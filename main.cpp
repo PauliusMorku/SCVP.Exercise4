@@ -2,7 +2,6 @@
 #include <iostream>
 
 // Place Interface:
-//template <class T>
 class placeInterface : public sc_interface
 {
 public:
@@ -35,6 +34,7 @@ public:
 
     void fire(void)
     {
+        // this loop checks if every input port contains atleast one token, if not - return is called
         for (unsigned int i = 0; i < N; i++)
         {
             if (in[i]->testTokens() <= 0)
@@ -67,7 +67,7 @@ public:
 SC_MODULE(toplevel)
 {
     public:
-    transition<1,2> t1; // <?,?> passes parameters to transition, <> leaves parameters as defaults
+    transition<1,2> t1; // <?,?> passes parameters to module, <> leaves default parameters
     transition<2,1> t2;
     transition<1,1> t3;
     place p1, p2, p3, p4;
