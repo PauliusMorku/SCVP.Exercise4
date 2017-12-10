@@ -175,20 +175,17 @@ SC_MODULE(memoryBankModified)
     transition<1,1> RD;
     transition<1,1> PRE;
     transition<1,1> WR;
-    //place<1,1> IDLE;
     place<3,3> ACTIVE;
 
     SC_CTOR(memoryBankModified) : ACT("ACT"), RD("RD"), PRE("PRE"), WR("WR"), ACTIVE(0)
     {
         SC_THREAD(process);
 
-        //ACT.in.bind(IDLE);
         ACT.inhibitors.bind(ACTIVE); // connecting inhibitor-arc
         ACT.out.bind(ACTIVE);
         RD.in.bind(ACTIVE);
         RD.out.bind(ACTIVE);
         PRE.in.bind(ACTIVE);
-        //PRE.out.bind(IDLE);
         WR.in.bind(ACTIVE);
         WR.out.bind(ACTIVE);
     }
@@ -264,14 +261,18 @@ SC_MODULE(twoMemoryBanks)
 
 int sc_main(int argc, char* argv[])
 {
-    toplevel t("top");
-    memoryBank mb("memoryBank");
+    // uncomment module to simulate it
+    //toplevel t("top");
+    //memoryBank mb("memoryBank");
     twoMemoryBanks tmb("twoMemoryBanks");
 
     /* TODO: ask why do I get following warning when running twoMemoryBanks.
      * Warning: (W545) sc_stop has already been called
      * In file: sc_simcontext.cpp:1047
      * In process: twoMemoryBanks.s2.process @ 60 ns
+     *
+     * Other questions:
+     * So binding means that we can call binded object functions, because otherwise we would only have interface without implementation?
      */
 
     sc_start();
