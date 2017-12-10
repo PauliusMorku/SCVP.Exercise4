@@ -32,12 +32,13 @@ private:
 };
 
 // Transition:
-template<unsigned int N=1, unsigned int M=1>
+template<unsigned int N=1, unsigned int M=1, unsigned int L=0>
 SC_MODULE(transition)
 {
 public:
     sc_port<placeInterface, N, SC_ALL_BOUND> in;
     sc_port<placeInterface, M, SC_ALL_BOUND> out;
+    sc_port<placeInterface, L, SC_ZERO_OR_MORE_BOUND> inhibitors; // SC_ZERO_OR_MORE_BOUND means that we can leave this port unbinded
 
     void fire(void)
     {
@@ -45,6 +46,16 @@ public:
         for (unsigned int i = 0; i < N; i++)
         {
             if (in[i]->testTokens() == false)
+            {
+                std::cout << this->name() << ": NOT Fired" << std::endl;
+                return;
+            }
+        }
+
+        // we do not fire if there are tokens on inhibitor-arc
+        for (unsigned int i = 0; i < L; i++)
+        {
+            if (inhibitors[i]->testTokens() == true)
             {
                 std::cout << this->name() << ": NOT Fired" << std::endl;
                 return;
@@ -111,7 +122,7 @@ SC_MODULE(toplevel)
 };
 
 // Memory Bank
-SC_MODULE(memorybank)
+SC_MODULE(memoryBank)
 {
     public:
     transition<1,1> ACT;
@@ -121,7 +132,7 @@ SC_MODULE(memorybank)
     place<1,1> IDLE;
     place<3,3> ACTIVE;
 
-    SC_CTOR(memorybank) : ACT("ACT"), RD("RD"), PRE("PRE"), WR("WR"), IDLE(1), ACTIVE(0)
+    SC_CTOR(memoryBank) : ACT("ACT"), RD("RD"), PRE("PRE"), WR("WR"), IDLE(1), ACTIVE(0)
     {
         SC_THREAD(process);
 
@@ -156,10 +167,112 @@ SC_MODULE(memorybank)
     }
 };
 
+// Memory Bank used for Hierarchical PNs, it does not contain IDLE state and has inhibitor-arcs
+SC_MODULE(memoryBankModified)
+{
+    public:
+    transition<1,1,1> ACT; // include one inhibitor-arc
+    transition<1,1> RD;
+    transition<1,1> PRE;
+    transition<1,1> WR;
+    //place<1,1> IDLE;
+    place<3,3> ACTIVE;
+
+    SC_CTOR(memoryBankModified) : ACT("ACT"), RD("RD"), PRE("PRE"), WR("WR"), ACTIVE(0)
+    {
+        SC_THREAD(process);
+
+        //ACT.in.bind(IDLE);
+        ACT.inhibitors.bind(ACTIVE); // connecting inhibitor-arc
+        ACT.out.bind(ACTIVE);
+        RD.in.bind(ACTIVE);
+        RD.out.bind(ACTIVE);
+        PRE.in.bind(ACTIVE);
+        //PRE.out.bind(IDLE);
+        WR.in.bind(ACTIVE);
+        WR.out.bind(ACTIVE);
+    }
+
+    void process()
+    {
+        while(true)
+        {
+            wait(10,SC_NS);
+            ACT.fire();
+            wait(10,SC_NS);
+            ACT.fire();
+            wait(10,SC_NS);
+            RD.fire();
+            wait(10,SC_NS);
+            WR.fire();
+            wait(10,SC_NS);
+            PRE.fire();
+            wait(10,SC_NS);
+            ACT.fire();
+            sc_stop();
+        }
+    }
+};
+
+// Two Memory Banks
+SC_MODULE(twoMemoryBanks)
+{
+    public:
+    memoryBankModified s1;
+    memoryBankModified s2;
+    place<1,1> IDLE;
+
+    SC_CTOR(twoMemoryBanks) : s1("s1"), s2("s2"), IDLE(2)
+    {
+        SC_THREAD(process);
+
+        s1.ACT.in.bind(IDLE);
+        s2.ACT.in.bind(IDLE);
+        s1.PRE.out.bind(IDLE);
+        s2.PRE.out.bind(IDLE);
+    }
+
+    void process()
+    {
+        while(true)
+        {
+            wait(10,SC_NS);
+            s1.ACT.fire();
+            wait(10,SC_NS);
+            s1.ACT.fire();
+            wait(10,SC_NS);
+            s1.RD.fire();
+            wait(10,SC_NS);
+            s1.WR.fire();
+            wait(10,SC_NS);
+            s1.PRE.fire();
+            wait(10,SC_NS);
+            s1.ACT.fire();
+            wait(10,SC_NS);
+            s2.ACT.fire();
+            wait(10,SC_NS);
+            s2.ACT.fire();
+            wait(10,SC_NS);
+            s1.PRE.fire();
+            wait(10,SC_NS);
+            s2.PRE.fire();
+            wait(10,SC_NS);
+            sc_stop();
+        }
+    }
+};
+
 int sc_main(int argc, char* argv[])
 {
-    //toplevel t("top");
-    memorybank mb("memorybank");
+    toplevel t("top");
+    memoryBank mb("memoryBank");
+    twoMemoryBanks tmb("twoMemoryBanks");
+
+    /* TODO: ask why do I get following warning when running twoMemoryBanks.
+     * Warning: (W545) sc_stop has already been called
+     * In file: sc_simcontext.cpp:1047
+     * In process: twoMemoryBanks.s2.process @ 60 ns
+     */
 
     sc_start();
     return 0;
